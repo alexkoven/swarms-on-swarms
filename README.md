@@ -1,14 +1,15 @@
 # Swarm vs Swarm Simulation
 
-A high-performance Python simulation of multiple swarms of agents interacting in a 2D environment. The simulation features efficient collision detection using spatial hashing, real-time visualization, and configurable agent behaviors.
+Python simulation of adversarial swarms interacting in a 2D environment. The simulation features collision detection using spatial hashing, real-time visualization, and configurable agent behaviors.
+
+![Swarm Simulation](swarm_sim.gif)
 
 ## Features
 
 - **Efficient Collision Detection**: Uses spatial hashing for O(1) collision checks
-- **Real-time Visualization**: Live visualization of agent positions and simulation state
-- **Configurable Parameters**: Customize world size, agent properties, and simulation settings
+- **Real-time Visualization**: Live visualization of agent positions and simulation state 
 - **Performance Optimized**: Designed for large-scale simulations with thousands of agents
-- **Extensible Architecture**: Easy to add new agent behaviors and controllers
+- **Configurable Parameters**: Customize world size, agent properties, and simulation settings
 
 ## Installation
 
@@ -43,6 +44,21 @@ python -m swarm_sim.main
 - `--steps N`: Run simulation for N steps (default: infinite)
 - `--no-vis`: Disable visualization
 - `--config PATH`: Load configuration from file
+- `--max-velocity VALUE`: Set maximum velocity for agents
+- `--time-step VALUE`: Set simulation time step in seconds
+- `--save-gif PATH`: Save animation as GIF to specified path
+
+### Example Commands
+
+Run a 100-step simulation and save as GIF:
+```bash
+python -m swarm_sim.main --steps 100 --save-gif simulation.gif
+```
+
+Run with increased velocity:
+```bash
+python -m swarm_sim.main --max-velocity 200
+```
 
 ### Python API
 
@@ -55,7 +71,8 @@ from swarm_sim.config import SimulationConfig
 config = SimulationConfig(
     WORLD_SIZE=(1000.0, 1000.0),
     AGENTS_PER_TEAM=500,
-    VISUALIZE=True
+    VISUALIZE=True,
+    BOUNDARY_TYPE="bounce"  # Use "wrap" or "bounce"
 )
 
 # Create environment and controller
@@ -80,6 +97,7 @@ config = SimulationConfig(
     # World parameters
     WORLD_SIZE=(1000.0, 1000.0),
     TIME_STEP=0.016,  # 60 FPS
+    BOUNDARY_TYPE="bounce",  # "wrap" or "bounce"
     
     # Agent parameters
     AGENT_RADIUS=5.0,
@@ -121,13 +139,6 @@ config = SimulationConfig(
    - Controls agent movement
    - Team-specific strategies
 
-### Performance Considerations
-
-- Spatial hashing reduces collision checks from O(n²) to O(n)
-- Vectorized operations using NumPy
-- Efficient memory management
-- Configurable visualization options
-
 ## Development
 
 ### Running Tests
@@ -136,41 +147,9 @@ config = SimulationConfig(
 pytest
 ```
 
-### Code Style
-
-The project uses:
-- Black for code formatting
-- MyPy for type checking
-- Pylint for code quality
-
-Run all checks:
-```bash
-black .
-mypy .
-pylint swarm_sim
-```
-
 ### Adding New Features
 
 1. Create new controller class in `swarm_sim/controllers/`
 2. Add tests in `swarm_sim/tests/`
 3. Update documentation
 4. Run test suite
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## Acknowledgments
-
-- Inspired by swarm intelligence research
-- Built with Python and NumPy
-- Visualization powered by Matplotlib 
