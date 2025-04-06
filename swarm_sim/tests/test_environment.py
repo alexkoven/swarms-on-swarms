@@ -3,25 +3,30 @@
 import pytest
 import numpy as np
 from ..environment.swarm_env import SwarmEnv
-from ..config import config, SimulationConfig
+from ..environment.agent import Agent
+from ..config import SimulationConfig
 
 @pytest.fixture
-def env():
-    """Create a simulation environment for testing."""
-    test_config = SimulationConfig(
+def test_config():
+    """Create a test configuration."""
+    return SimulationConfig(
         TIME_STEP=0.1,
         AGENTS_PER_TEAM=0  # No agents for testing
     )
+
+@pytest.fixture
+def env(test_config):
+    """Create a simulation environment for testing."""
     return SwarmEnv(test_config)
 
-def test_initialization(env):
+def test_initialization(env, test_config):
     """Test environment initialization."""
-    assert env.config.TIME_STEP == 0.1
+    assert env.config.TIME_STEP == test_config.TIME_STEP
     assert env.step_count == 0
     assert len(env.agents) == 0
     assert all(count == 0 for count in env.team_counts.values())
 
-def test_add_agent(env):
+def test_add_agent(env, test_config):
     """Test agent addition."""
     position = np.array([0.0, 0.0])
     velocity = np.array([1.0, 1.0])
@@ -35,7 +40,7 @@ def test_add_agent(env):
     assert np.array_equal(agent.velocity, velocity)
     assert agent.team_id == team_id
 
-def test_remove_agent(env):
+def test_remove_agent(env, test_config):
     """Test agent removal."""
     agent = env.add_agent(np.array([0.0, 0.0]), np.array([1.0, 1.0]), 0)
     assert env.team_counts[0] == 1
@@ -45,7 +50,7 @@ def test_remove_agent(env):
     assert env.team_counts[0] == 0
     assert not agent.is_active
 
-def test_get_team_agents(env):
+def test_get_team_agents(env, test_config):
     """Test getting agents by team."""
     # Add agents to different teams
     agent1 = env.add_agent(np.array([0.0, 0.0]), np.array([1.0, 1.0]), 0)
@@ -61,7 +66,7 @@ def test_get_team_agents(env):
     assert agent2 in team0_agents
     assert agent3 in team1_agents
 
-def test_get_nearby_agents(env):
+def test_get_nearby_agents(env, test_config):
     """Test getting nearby agents."""
     agent1 = env.add_agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0)
     agent2 = env.add_agent(np.array([5.0, 5.0]), np.array([0.0, 0.0]), 1)  # Close to agent1
@@ -71,7 +76,7 @@ def test_get_nearby_agents(env):
     assert agent2 in nearby  # Should be nearby
     assert agent3 not in nearby  # Should be too far
 
-def test_collision_detection(env):
+def test_collision_detection(env, test_config):
     """Test collision detection between agents."""
     agent1 = env.add_agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0)
     agent2 = env.add_agent(np.array([2.0, 2.0]), np.array([0.0, 0.0]), 1)  # Close enough to collide
@@ -81,7 +86,7 @@ def test_collision_detection(env):
     assert agent2 in collisions
     assert agent3 not in collisions
 
-def test_handle_collisions(env):
+def test_handle_collisions(env, test_config):
     """Test collision handling."""
     agent1 = env.add_agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0)
     agent2 = env.add_agent(np.array([2.0, 2.0]), np.array([0.0, 0.0]), 1)
@@ -94,7 +99,7 @@ def test_handle_collisions(env):
     assert env.team_counts[0] == 0
     assert env.team_counts[1] == 0
 
-def test_step(env):
+def test_step(env, test_config):
     """Test simulation step."""
     # Add two agents on collision course
     agent1 = env.add_agent(np.array([0.0, 0.0]), np.array([10.0, 10.0]), 0)
@@ -109,7 +114,7 @@ def test_step(env):
     
     assert env.step_count > 0
 
-def test_reset(env):
+def test_reset(env, test_config):
     """Test environment reset."""
     # Add some agents and run steps
     env.add_agent(np.array([0.0, 0.0]), np.array([1.0, 1.0]), 0)
@@ -122,7 +127,7 @@ def test_reset(env):
     assert len(env.agents) == 0
     assert all(count == 0 for count in env.team_counts.values())
 
-def test_get_state(env):
+def test_get_state(env, test_config):
     """Test getting environment state."""
     agent = env.add_agent(np.array([0.0, 0.0]), np.array([1.0, 1.0]), 0)
     env.step()

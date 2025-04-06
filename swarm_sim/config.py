@@ -72,5 +72,11 @@ class SimulationConfig:
         assert self.FRAME_RATE > 0, "FRAME_RATE must be positive"
         assert self.BOUNDARY_TYPE in ["wrap", "bounce"], "BOUNDARY_TYPE must be 'wrap' or 'bounce'"
 
-# Create global config instance
-config = SimulationConfig() 
+    @classmethod
+    def default(cls) -> 'SimulationConfig':
+        """Create a default configuration instance.
+        
+        Returns:
+            SimulationConfig: Default configuration instance
+        """
+        return cls() 

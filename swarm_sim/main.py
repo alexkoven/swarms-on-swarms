@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 from .environment.swarm_env import SwarmEnv
 from .controllers.random_controller import RandomController
-from .config import config, SimulationConfig
+from .config import SimulationConfig
 
 class SwarmSimulation:
     """Main simulation class handling visualization and control.
@@ -254,7 +254,7 @@ def main():
     args = parser.parse_args()
     
     # Create configuration
-    config = SimulationConfig()
+    config = SimulationConfig.default()
     if args.config:
         # TODO: Load config from file
         pass

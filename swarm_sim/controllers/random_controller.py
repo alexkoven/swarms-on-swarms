@@ -1,82 +1,83 @@
-"""Random controller for basic agent movement control."""
+"""Random controller for swarm agents.
 
-from typing import Dict, List, Tuple
+This module implements a simple random controller that moves agents in random directions.
+It's used for testing and demonstration purposes.
+"""
+
 import numpy as np
+from typing import List
 from ..environment.agent import Agent
-from ..config import config
 
 class RandomController:
-    """Controller that generates random actions for agents.
+    """Random controller for swarm agents.
     
-    This controller provides basic movement control by generating random
-    velocity changes within specified constraints. It is primarily used for
-    testing and demonstration purposes, as it does not implement any
-    strategic behavior.
-    
-    The controller generates random velocity changes in both x and y
-    directions, which are then applied to the agent's current velocity.
-    The changes are bounded by max_velocity_change to ensure smooth
-    movement and prevent sudden direction changes.
+    This controller moves agents in random directions while respecting:
+    - Maximum velocity limits
+    - Maximum velocity change per step
+    - World boundaries
     
     Attributes:
-        max_velocity_change (float): Maximum allowed change in velocity per step
-        action_space (Tuple[float, float]): Range for random action values,
-            defined as (-max_velocity_change, max_velocity_change)
-    
-    Example:
-        >>> controller = RandomController(max_velocity_change=1.0)
-        >>> action = controller.get_action(agent)
-        >>> agent.set_velocity(agent.velocity + action)
+        max_velocity_change: Maximum change in velocity per step
     """
     
-    def __init__(self, max_velocity_change: float = config.MAX_VELOCITY_CHANGE):
-        """Initialize the random controller.
+    def __init__(self, max_velocity_change: float = None):
+        """Initialize the controller.
         
         Args:
-            max_velocity_change (float): Maximum allowed change in velocity per step
+            max_velocity_change: Maximum change in velocity per step.
+                               If None, will be set from agent config.
         """
         self.max_velocity_change = max_velocity_change
-        self.action_space = (-max_velocity_change, max_velocity_change)
     
     def get_action(self, agent: Agent) -> np.ndarray:
-        """Generate a random action for the agent.
+        """Get a random action for the agent.
         
         Args:
-            agent (Agent): Agent to generate action for
+            agent: Agent to control
             
         Returns:
-            np.ndarray: Random velocity change vector [dvx, dvy]
+            New velocity vector
         """
-        # Generate random velocity changes within constraints
-        dvx = np.random.uniform(*self.action_space)
-        dvy = np.random.uniform(*self.action_space)
+        # Use agent's config if not specified
+        max_change = (self.max_velocity_change 
+                     if self.max_velocity_change is not None 
+                     else agent.config.MAX_VELOCITY_CHANGE)
         
-        return np.array([dvx, dvy])
+        # Random change in velocity
+        angle = np.random.uniform(0, 2 * np.pi)
+        magnitude = np.random.uniform(0, max_change)
+        change = np.array([
+            magnitude * np.cos(angle),
+            magnitude * np.sin(angle)
+        ])
+        
+        # Apply change to current velocity
+        new_velocity = agent.velocity + change
+        
+        # Limit speed
+        velocity_magnitude = np.linalg.norm(new_velocity)
+        if velocity_magnitude > agent.config.MAX_VELOCITY:
+            new_velocity = new_velocity * (agent.config.MAX_VELOCITY / velocity_magnitude)
+        
+        return new_velocity
     
     def apply_action(self, agent: Agent, action: np.ndarray) -> None:
-        """Apply the action to the agent's velocity.
+        """Apply the action to the agent.
         
         Args:
-            agent (Agent): Agent to apply action to
-            action (np.ndarray): Velocity change vector [dvx, dvy]
+            agent: Agent to control
+            action: New velocity vector
         """
-        # Update velocity with action
-        new_velocity = agent.velocity + action
-        
-        # Ensure velocity magnitude doesn't exceed maximum
-        velocity_magnitude = np.linalg.norm(new_velocity)
-        if velocity_magnitude > config.MAX_VELOCITY:
-            new_velocity = new_velocity * (config.MAX_VELOCITY / velocity_magnitude)
-        
-        agent.velocity = new_velocity
+        agent.set_velocity(action)
     
     def control_team(self, agents: List[Agent]) -> None:
-        """Control all agents in a team.
+        """Control a team of agents.
         
         Args:
-            agents (List[Agent]): List of agents to control
+            agents: List of agents to control
         """
         for agent in agents:
-            if agent.is_active:
-                action = self.get_action(agent)
-                self.apply_action(agent, action) 
+            if not agent.is_active:
+                continue
+            action = self.get_action(agent)
+            self.apply_action(agent, action) 

@@ -58,6 +58,10 @@ class SpatialHash:
         self.collision_checks = 0
         
         # Initialize all bins
+        self._initialize_bins()
+    
+    def _initialize_bins(self) -> None:
+        """Initialize all bins in the grid."""
         for x in range(self.num_bins_x):
             for y in range(self.num_bins_y):
                 self.bins[(x, y)] = Bin(set(), (x, y))
@@ -160,8 +164,8 @@ class SpatialHash:
     
     def clear(self) -> None:
         """Clear all agents from the spatial hash."""
-        self.bins.clear()
         self.agent_bins.clear()
+        self._initialize_bins()  # Reinitialize empty bins
     
     def remove_agent(self, agent: Agent) -> None:
         """Remove an agent from the spatial hash.

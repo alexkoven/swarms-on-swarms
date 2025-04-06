@@ -18,7 +18,7 @@ def basic_simulation():
     3. Access simulation state
     """
     # Create configuration
-    config = SimulationConfig()
+    config = SimulationConfig.default()
     
     # Create environment
     env = SwarmEnv(config)
