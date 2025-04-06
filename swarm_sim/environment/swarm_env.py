@@ -1,69 +1,101 @@
-"""Main simulation environment managing agent states and simulation loop."""
+"""Main simulation environment for swarm-vs-swarm simulation.
 
-from typing import List, Dict, Set, Optional, Tuple
+This module implements the main simulation environment that manages agent states
+and the simulation loop. It handles:
+- Agent creation and management
+- State updates
+- Collision detection and handling
+- Environment observation
+"""
+
+import time
 import numpy as np
+from typing import List, Set, Dict, Tuple
+from dataclasses import dataclass
+
 from .agent import Agent
 from .spatial_hash import SpatialHash
-from ..config import config
+from ..config import SimulationConfig
 
-class SwarmEnv:
-    """Main simulation environment for swarm-vs-swarm interactions.
-    
-    This class manages the simulation state, including agent creation,
-    updates, collision detection, and state observations.
+@dataclass
+class SimulationState:
+    """Current state of the simulation.
     
     Attributes:
-        agents (List[Agent]): List of all agents in the simulation
-        spatial_hash (SpatialHash): Spatial partitioning for collision detection
-        time_step (float): Current simulation time step
-        step_count (int): Number of simulation steps executed
-        team_counts (Dict[int, int]): Number of active agents per team
+        step_count: Current simulation step
+        active_agents: List of active agents
+        team_counts: Dictionary mapping team IDs to number of active agents
+        step_time: Time taken for last step in seconds
+    """
+    step_count: int
+    active_agents: List[Agent]
+    team_counts: Dict[int, int]
+    step_time: float
+
+class SwarmEnv:
+    """Main simulation environment for swarm-vs-swarm simulation.
+    
+    This class manages the simulation state and provides methods for:
+    - Adding and removing agents
+    - Updating agent states
+    - Detecting and handling collisions
+    - Getting environment observations
+    
+    Attributes:
+        config: Simulation configuration
+        agents: List of all agents in the simulation
+        spatial_hash: Spatial hash for efficient collision detection
+        time_step: Simulation time step
+        step_count: Current simulation step
+        team_counts: Dictionary mapping team IDs to number of active agents
     """
     
-    def __init__(self, time_step: float = config.TIME_STEP):
+    def __init__(self, config: SimulationConfig):
         """Initialize the simulation environment.
         
         Args:
-            time_step (float): Time step for simulation updates
+            config: Simulation configuration
         """
+        self.config = config
         self.agents: List[Agent] = []
-        self.spatial_hash = SpatialHash()
-        self.time_step = time_step
+        self.spatial_hash = SpatialHash(config)
+        self.time_step = config.TIME_STEP
         self.step_count = 0
-        self.team_counts = {i: 0 for i in range(config.NUM_TEAMS)}
+        self.team_counts: Dict[int, int] = {}
         
-        # Validate time step
-        assert time_step > 0, "Time step must be positive"
+        # Initialize team counts
+        for team_id in range(config.NUM_TEAMS):
+            self.team_counts[team_id] = 0
         
-        # Initialize agents for each team
+        # Initialize agents
         self.initialize_agents()
     
     def initialize_agents(self) -> None:
         """Initialize agents for each team with random positions and velocities."""
-        margin = 100.0  # Keep agents away from world boundaries
-        world_size = config.WORLD_SIZE - 2 * margin
+        margin = self.config.AGENT_RADIUS * 2  # Keep agents away from boundaries
+        world_size = np.array(self.config.WORLD_SIZE)
         
-        for team_id in range(config.NUM_TEAMS):
-            # Determine team's starting area
-            if team_id == 0:
-                # Team 0 starts on the left side
-                x_range = (margin, world_size / 2)
-            else:
-                # Team 1 starts on the right side
-                x_range = (world_size / 2 + margin, world_size)
+        for team_id in range(self.config.NUM_TEAMS):
+            # Calculate team's starting area
+            team_width = (world_size[0] - 2 * margin) / self.config.NUM_TEAMS
+            x_start = margin + team_id * team_width
+            x_end = x_start + team_width
             
             # Create agents for this team
-            for _ in range(config.AGENTS_PER_TEAM):
+            for _ in range(self.config.AGENTS_PER_TEAM):
                 # Random position within team's area
                 position = np.array([
-                    np.random.uniform(*x_range),
-                    np.random.uniform(margin, world_size)
+                    np.random.uniform(x_start, x_end),
+                    np.random.uniform(margin, world_size[1] - margin)
                 ])
                 
-                # Random initial velocity
+                # Random velocity
                 angle = np.random.uniform(0, 2 * np.pi)
-                speed = np.random.uniform(0, config.MAX_VELOCITY)
-                velocity = speed * np.array([np.cos(angle), np.sin(angle)])
+                speed = np.random.uniform(0, self.config.MAX_VELOCITY)
+                velocity = np.array([
+                    speed * np.cos(angle),
+                    speed * np.sin(angle)
+                ])
                 
                 self.add_agent(position, velocity, team_id)
     
@@ -71,12 +103,12 @@ class SwarmEnv:
         """Add a new agent to the simulation.
         
         Args:
-            position (np.ndarray): Initial position vector [x, y]
-            velocity (np.ndarray): Initial velocity vector [vx, vy]
-            team_id (int): Team identifier
+            position: Initial position [x, y]
+            velocity: Initial velocity [vx, vy]
+            team_id: Team ID for the agent
             
         Returns:
-            Agent: The newly created agent
+            The created agent
         """
         agent = Agent(position, velocity, team_id)
         self.agents.append(agent)
@@ -88,128 +120,117 @@ class SwarmEnv:
         """Remove an agent from the simulation.
         
         Args:
-            agent (Agent): Agent to remove
+            agent: Agent to remove
         """
         if agent in self.agents:
-            agent.deactivate()
+            self.agents.remove(agent)
             self.spatial_hash.remove(agent)
             self.team_counts[agent.team_id] -= 1
-            self.agents.remove(agent)
     
     def get_team_agents(self, team_id: int) -> List[Agent]:
         """Get all active agents for a specific team.
         
         Args:
-            team_id (int): Team identifier
+            team_id: Team ID to get agents for
             
         Returns:
-            List[Agent]: List of active agents in the team
+            List of active agents for the team
         """
-        return [agent for agent in self.agents if agent.team_id == team_id and agent.is_active]
+        return [a for a in self.agents if a.team_id == team_id and a.is_active]
     
     def get_nearby_agents(self, agent: Agent) -> Set[Agent]:
-        """Get all agents near the specified agent.
+        """Get all agents that could potentially collide with the given agent.
         
         Args:
-            agent (Agent): Agent to find neighbors for
+            agent: Agent to check for nearby agents
             
         Returns:
-            Set[Agent]: Set of nearby agents
+            Set of nearby agents
         """
         return self.spatial_hash.get_potential_collisions(agent)
     
-    def check_collisions(self, agent: Agent) -> List[Agent]:
-        """Check for collisions with the specified agent.
+    def handle_collisions(self) -> None:
+        """Handle collisions between agents.
         
-        Args:
-            agent (Agent): Agent to check collisions for
-            
-        Returns:
-            List[Agent]: List of agents colliding with the specified agent
+        When agents from different teams collide, they are deactivated.
         """
-        collisions = []
-        potential_collisions = self.get_nearby_agents(agent)
-        
-        for other_agent in potential_collisions:
-            if self.spatial_hash.check_collision(agent, other_agent):
-                collisions.append(other_agent)
-        
-        return collisions
-    
-    def handle_collisions(self) -> List[Tuple[Agent, Agent]]:
-        """Handle collisions between all agents.
-        
-        Returns:
-            List[Tuple[Agent, Agent]]: List of agent pairs that collided
-        """
-        collisions = []
-        checked_pairs = set()
-        
         for agent in self.agents:
             if not agent.is_active:
                 continue
                 
-            collision_agents = self.check_collisions(agent)
-            for other_agent in collision_agents:
-                # Create a unique pair identifier
-                pair = tuple(sorted([id(agent), id(other_agent)]))
-                if pair not in checked_pairs:
-                    collisions.append((agent, other_agent))
-                    checked_pairs.add(pair)
+            nearby_agents = self.get_nearby_agents(agent)
+            for other in nearby_agents:
+                if not other.is_active or agent.team_id == other.team_id:
+                    continue
                     
-                    # Handle collision by deactivating both agents
-                    self.remove_agent(agent)
-                    self.remove_agent(other_agent)
-        
-        return collisions
+                if agent.check_collision(other):
+                    agent.is_active = False
+                    other.is_active = False
+                    break
     
-    def step(self) -> List[Tuple[Agent, Agent]]:
+    def step(self) -> SimulationState:
         """Execute one simulation step.
         
+        This method:
+        1. Updates agent positions and velocities
+        2. Handles collisions
+        3. Updates spatial hash
+        4. Returns current simulation state
+        
         Returns:
-            List[Tuple[Agent, Agent]]: List of agent pairs that collided
+            Current simulation state
         """
-        # Update agent positions
+        start_time = time.time()
+        
+        # Update agent states
         for agent in self.agents:
-            if agent.is_active:
-                old_position = agent.position.copy()
-                agent.update_position(self.time_step)
+            if not agent.is_active:
+                continue
                 
-                # Update spatial hash if position changed
-                if not np.array_equal(old_position, agent.position):
-                    self.spatial_hash.update(agent)
+            # Update position
+            agent.position += agent.velocity * self.time_step
+            
+            # Handle world boundaries
+            agent.position[0] %= self.config.WORLD_SIZE[0]
+            agent.position[1] %= self.config.WORLD_SIZE[1]
+            
+            # Update spatial hash
+            self.spatial_hash.update(agent)
         
         # Handle collisions
-        collisions = self.handle_collisions()
+        self.handle_collisions()
         
         # Update step count
         self.step_count += 1
         
-        return collisions
+        # Calculate step time
+        step_time = time.time() - start_time
+        
+        # Return current state
+        return SimulationState(
+            step_count=self.step_count,
+            active_agents=[a for a in self.agents if a.is_active],
+            team_counts=self.team_counts.copy(),
+            step_time=step_time
+        )
     
     def reset(self) -> None:
         """Reset the simulation to its initial state."""
         self.agents.clear()
-        self.spatial_hash.clear()
+        self.spatial_hash = SpatialHash(self.config)
         self.step_count = 0
-        self.team_counts = {i: 0 for i in range(config.NUM_TEAMS)}
+        self.team_counts = {i: 0 for i in range(self.config.NUM_TEAMS)}
+        self.initialize_agents()
     
-    def get_state(self) -> Dict:
+    def get_state(self) -> SimulationState:
         """Get the current state of the simulation.
         
         Returns:
-            Dict: Current simulation state including agent states and statistics
+            Current simulation state
         """
-        return {
-            'step_count': self.step_count,
-            'team_counts': self.team_counts.copy(),
-            'agents': [
-                {
-                    'position': agent.position.copy(),
-                    'velocity': agent.velocity.copy(),
-                    'team_id': agent.team_id,
-                    'is_active': agent.is_active
-                }
-                for agent in self.agents
-            ]
-        } 
+        return SimulationState(
+            step_count=self.step_count,
+            active_agents=[a for a in self.agents if a.is_active],
+            team_counts=self.team_counts.copy(),
+            step_time=0.0  # Not applicable for current state
+        ) 

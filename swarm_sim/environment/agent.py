@@ -110,4 +110,20 @@ class Agent:
         # Convert position and velocity to tuples for hashing
         pos_tuple = tuple(self.position)
         vel_tuple = tuple(self.velocity)
-        return hash((pos_tuple, vel_tuple, self.team_id, self.radius, self.is_active)) 
+        return hash((pos_tuple, vel_tuple, self.team_id, self.radius, self.is_active))
+    
+    def check_collision(self, other: 'Agent') -> bool:
+        """Check if this agent collides with another agent.
+        
+        Args:
+            other: Other agent to check collision with
+            
+        Returns:
+            True if agents collide, False otherwise
+        """
+        # Calculate distance between agents
+        diff = self.position - other.position
+        distance = np.linalg.norm(diff)
+        
+        # Collision occurs if distance is less than sum of radii
+        return distance < (self.radius + other.radius) 

@@ -1,54 +1,68 @@
-"""Configuration settings for the swarm simulation."""
+"""Configuration for the swarm simulation.
+
+This module contains all configuration parameters for the simulation, including:
+- World parameters (size, time step)
+- Agent parameters (radius, speed, etc.)
+- Team parameters (number of teams, agents per team)
+- Visualization parameters (colors, frame rate)
+"""
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Tuple
 import os
 from dotenv import load_dotenv
+import numpy as np
 
 # Load environment variables from .env file if it exists
 load_dotenv()
 
 @dataclass
 class SimulationConfig:
-    """Configuration parameters for the simulation."""
+    """Configuration parameters for the simulation.
     
-    # World settings
-    WORLD_SIZE: float = float(os.getenv("WORLD_SIZE", "1000.0"))
-    TIME_STEP: float = float(os.getenv("TIME_STEP", "0.1"))
+    Attributes:
+        WORLD_SIZE: Size of the world in (width, height)
+        TIME_STEP: Simulation time step in seconds
+        AGENT_RADIUS: Radius of each agent
+        MAX_VELOCITY: Maximum agent velocity
+        MAX_VELOCITY_CHANGE: Maximum change in velocity per step
+        NUM_TEAMS: Number of teams in the simulation
+        AGENTS_PER_TEAM: Number of agents per team
+        TEAM_COLORS: Colors for each team in the visualization
+        FRAME_RATE: Frame rate for visualization
+        VISUALIZE: Whether to show visualization
+    """
     
-    # Agent settings
-    AGENT_RADIUS: float = float(os.getenv("AGENT_RADIUS", "5.0"))
-    MAX_VELOCITY: float = float(os.getenv("MAX_VELOCITY", "50.0"))
-    MAX_VELOCITY_CHANGE: float = float(os.getenv("MAX_VELOCITY_CHANGE", "10.0"))
+    # World parameters
+    WORLD_SIZE: Tuple[float, float] = (1000.0, 1000.0)
+    TIME_STEP: float = 0.016  # 60 FPS
     
-    # Team settings
-    NUM_TEAMS: int = int(os.getenv("NUM_TEAMS", "2"))
-    AGENTS_PER_TEAM: int = int(os.getenv("AGENTS_PER_TEAM", "50"))  # Reduced for better visualization
+    # Agent parameters
+    AGENT_RADIUS: float = 5.0
+    MAX_VELOCITY: float = 100.0
+    MAX_VELOCITY_CHANGE: float = 10.0
     
-    # Spatial hash settings
-    BIN_SIZE: float = float(os.getenv("SPATIAL_HASH_BIN_SIZE", "10.0"))
+    # Team parameters
+    NUM_TEAMS: int = 2
+    AGENTS_PER_TEAM: int = 1000  # Increased for visualization
+    TEAM_COLORS: Tuple[str, ...] = ('red', 'blue')
     
-    # Visualization settings
-    VISUALIZE: bool = os.getenv("VISUALIZE", "true").lower() == "true"
-    FRAME_RATE: int = int(os.getenv("FRAME_RATE", "30"))
-    MAX_STEPS: int = int(os.getenv("MAX_STEPS", "1000"))
-    
-    # Team colors
-    TEAM_COLORS: List[str] = None
+    # Visualization parameters
+    FRAME_RATE: int = 60
+    VISUALIZE: bool = True
     
     def __post_init__(self):
-        """Initialize derived attributes."""
-        if self.TEAM_COLORS is None:
-            self.TEAM_COLORS = ['red', 'blue', 'green', 'yellow']
-
-    def validate(self) -> None:
         """Validate configuration parameters."""
-        assert self.WORLD_SIZE > 0, "World size must be positive"
-        assert self.NUM_TEAMS > 0, "Number of teams must be positive"
-        assert self.AGENT_RADIUS > 0, "Agent radius must be positive"
-        assert self.MAX_VELOCITY > 0, "Maximum velocity must be positive"
-        assert self.TIME_STEP > 0, "Time step must be positive"
-        assert self.BOUNDARY_TYPE in ["wrap", "bounce"], "Boundary type must be 'wrap' or 'bounce'"
+        assert len(self.WORLD_SIZE) == 2, "WORLD_SIZE must be a tuple of (width, height)"
+        assert all(s > 0 for s in self.WORLD_SIZE), "World dimensions must be positive"
+        assert self.TIME_STEP > 0, "TIME_STEP must be positive"
+        assert self.AGENT_RADIUS > 0, "AGENT_RADIUS must be positive"
+        assert self.MAX_VELOCITY > 0, "MAX_VELOCITY must be positive"
+        assert self.MAX_VELOCITY_CHANGE > 0, "MAX_VELOCITY_CHANGE must be positive"
+        assert self.NUM_TEAMS > 0, "NUM_TEAMS must be positive"
+        assert self.AGENTS_PER_TEAM > 0, "AGENTS_PER_TEAM must be positive"
+        assert len(self.TEAM_COLORS) >= self.NUM_TEAMS, "Not enough team colors"
+        assert self.FRAME_RATE > 0, "FRAME_RATE must be positive"
 
 # Create global config instance
 config = SimulationConfig() 
