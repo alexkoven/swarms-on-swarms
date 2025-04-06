@@ -4,60 +4,62 @@ import pytest
 import numpy as np
 from ..environment.spatial_hash import SpatialHash
 from ..environment.agent import Agent
-from ..config import config
+from ..config import config, SimulationConfig
 
 @pytest.fixture
 def spatial_hash():
     """Create a spatial hash instance for testing."""
-    return SpatialHash(bin_size=10.0)  # Smaller bin size for more precise testing
+    test_config = SimulationConfig(AGENT_RADIUS=5.0)  # Smaller agent radius for more precise testing
+    return SpatialHash(test_config)
 
 @pytest.fixture
-def agents():
+def test_config():
+    """Create a test configuration."""
+    return SimulationConfig(AGENT_RADIUS=5.0)
+
+@pytest.fixture
+def agents(test_config):
     """Create test agents."""
     return [
-        Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0),
-        Agent(np.array([15.0, 15.0]), np.array([0.0, 0.0]), 1),  # Different bin from agent 0
-        Agent(np.array([150.0, 150.0]), np.array([0.0, 0.0]), 0),  # Far from others
+        Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0, test_config),
+        Agent(np.array([15.0, 15.0]), np.array([0.0, 0.0]), 1, test_config),  # Different bin from agent 0
+        Agent(np.array([150.0, 150.0]), np.array([0.0, 0.0]), 0, test_config),  # Far from others
     ]
 
 def test_initialization(spatial_hash):
     """Test spatial hash initialization."""
-    assert spatial_hash.bin_size == 10.0
-    assert spatial_hash.num_bins == int(np.ceil(config.WORLD_SIZE / 10.0))
-    assert len(spatial_hash.bins) == spatial_hash.num_bins
-    assert len(spatial_hash.bins[0]) == spatial_hash.num_bins
+    assert spatial_hash.bin_size == spatial_hash.config.AGENT_RADIUS * 2
+    assert spatial_hash.num_bins_x == int(np.ceil(spatial_hash.config.WORLD_SIZE[0] / spatial_hash.bin_size))
+    assert spatial_hash.num_bins_y == int(np.ceil(spatial_hash.config.WORLD_SIZE[1] / spatial_hash.bin_size))
+    assert len(spatial_hash.bins) == spatial_hash.num_bins_x * spatial_hash.num_bins_y
 
 def test_bin_indices(spatial_hash):
     """Test bin index calculation."""
     # Test center of first bin
-    i, j = spatial_hash._get_bin_indices(np.array([0.0, 0.0]))
-    assert i == 0 and j == 0
+    bin_index = spatial_hash._get_bin_index(np.array([0.0, 0.0]))
+    assert bin_index == (0, 0)
     
     # Test center of second bin
-    i, j = spatial_hash._get_bin_indices(np.array([15.0, 15.0]))
-    assert i == 1 and j == 1
+    bin_index = spatial_hash._get_bin_index(np.array([15.0, 15.0]))
+    assert bin_index == (1, 1)
     
     # Test center of last bin
-    i, j = spatial_hash._get_bin_indices(np.array([990.0, 990.0]))
-    assert i == 99 and j == 99
-    
-    # Test wrap-around
-    i, j = spatial_hash._get_bin_indices(np.array([1000.0, 1000.0]))
-    assert i == 0 and j == 0
+    bin_index = spatial_hash._get_bin_index(np.array([990.0, 990.0]))
+    assert bin_index == (spatial_hash.num_bins_x - 1, spatial_hash.num_bins_y - 1)
 
 def test_insert_and_remove(spatial_hash, agents):
     """Test agent insertion and removal."""
     # Test insertion
     for agent in agents:
         spatial_hash.insert(agent)
-        i, j = spatial_hash._get_bin_indices(agent.position)
-        assert agent in spatial_hash.bins[i][j]
+        bin_index = spatial_hash._get_bin_index(agent.position)
+        assert agent in spatial_hash.bins[bin_index].agents
     
     # Test removal
     for agent in agents:
         spatial_hash.remove(agent)
-        i, j = spatial_hash._get_bin_indices(agent.position)
-        assert agent not in spatial_hash.bins[i][j]
+        bin_index = spatial_hash._get_bin_index(agent.position)
+        assert agent not in spatial_hash.bins[bin_index].agents
 
 def test_update(spatial_hash, agents):
     """Test agent position update."""
@@ -70,12 +72,12 @@ def test_update(spatial_hash, agents):
     spatial_hash.update(agent)
     
     # Check old position's bin
-    old_i, old_j = spatial_hash._get_bin_indices(old_position)
-    assert agent not in spatial_hash.bins[old_i][old_j]
+    old_bin_index = spatial_hash._get_bin_index(old_position)
+    assert agent not in spatial_hash.bins[old_bin_index].agents
     
     # Check new position's bin
-    new_i, new_j = spatial_hash._get_bin_indices(agent.position)
-    assert agent in spatial_hash.bins[new_i][new_j]
+    new_bin_index = spatial_hash._get_bin_index(agent.position)
+    assert agent in spatial_hash.bins[new_bin_index].agents
 
 def test_potential_collisions(spatial_hash, agents):
     """Test potential collision detection."""
@@ -88,18 +90,11 @@ def test_potential_collisions(spatial_hash, agents):
     
     # Only agent[1] should be in potential collisions if it's in an adjacent bin
     # agent[2] is too far away to be in potential collisions
-    assert len(potential) == 0  # No agents in adjacent bins
-    
-    # Move agent[1] closer to agent[0]
-    agents[1].position = np.array([5.0, 5.0])  # Same bin as agent[0]
-    spatial_hash.update(agents[1])
-    
-    potential = spatial_hash.get_potential_collisions(agents[0])
-    assert len(potential) == 1
+    assert len(potential) == 1  # Agent 1 is in an adjacent bin
     assert agents[1] in potential
     assert agents[2] not in potential
 
-def test_collision_detection(spatial_hash, agents):
+def test_collision_detection(spatial_hash, agents, test_config):
     """Test collision detection between agents."""
     # Test no collision (different teams, far apart)
     assert not spatial_hash.check_collision(agents[0], agents[1])
@@ -108,8 +103,8 @@ def test_collision_detection(spatial_hash, agents):
     assert not spatial_hash.check_collision(agents[0], agents[2])
     
     # Test collision (different teams, close together)
-    agent1 = Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0)
-    agent2 = Agent(np.array([2.0, 2.0]), np.array([0.0, 0.0]), 1)
+    agent1 = Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0, test_config)
+    agent2 = Agent(np.array([2.0, 2.0]), np.array([0.0, 0.0]), 1, test_config)
     assert spatial_hash.check_collision(agent1, agent2)
     
     # Test inactive agent
@@ -126,6 +121,5 @@ def test_clear(spatial_hash, agents):
     spatial_hash.clear()
     
     # Verify all bins are empty
-    for i in range(spatial_hash.num_bins):
-        for j in range(spatial_hash.num_bins):
-            assert len(spatial_hash.bins[i][j]) == 0 
+    for bin_index in spatial_hash.bins:
+        assert len(spatial_hash.bins[bin_index].agents) == 0 

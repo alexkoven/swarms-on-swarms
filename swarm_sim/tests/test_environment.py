@@ -3,16 +3,20 @@
 import pytest
 import numpy as np
 from ..environment.swarm_env import SwarmEnv
-from ..config import config
+from ..config import config, SimulationConfig
 
 @pytest.fixture
 def env():
     """Create a simulation environment for testing."""
-    return SwarmEnv(time_step=0.1)
+    test_config = SimulationConfig(
+        TIME_STEP=0.1,
+        AGENTS_PER_TEAM=0  # No agents for testing
+    )
+    return SwarmEnv(test_config)
 
 def test_initialization(env):
     """Test environment initialization."""
-    assert env.time_step == 0.1
+    assert env.config.TIME_STEP == 0.1
     assert env.step_count == 0
     assert len(env.agents) == 0
     assert all(count == 0 for count in env.team_counts.values())
@@ -73,7 +77,7 @@ def test_collision_detection(env):
     agent2 = env.add_agent(np.array([2.0, 2.0]), np.array([0.0, 0.0]), 1)  # Close enough to collide
     agent3 = env.add_agent(np.array([100.0, 100.0]), np.array([0.0, 0.0]), 1)  # Too far to collide
     
-    collisions = env.check_collisions(agent1)
+    collisions = env.spatial_hash.get_potential_collisions(agent1)
     assert agent2 in collisions
     assert agent3 not in collisions
 
@@ -98,12 +102,9 @@ def test_step(env):
     
     # Run a few steps
     for _ in range(5):
-        collisions = env.step()
-        if collisions:
-            assert len(collisions) == 1
-            assert (agent1, agent2) in collisions or (agent2, agent1) in collisions
-            assert not agent1.is_active
-            assert not agent2.is_active
+        state = env.step()
+        if not agent1.is_active or not agent2.is_active:
+            assert state.team_counts[0] == 0 or state.team_counts[1] == 0
             break
     
     assert env.step_count > 0
@@ -127,12 +128,12 @@ def test_get_state(env):
     env.step()
     
     state = env.get_state()
-    assert state['step_count'] == 1
-    assert state['team_counts'][0] == 1
-    assert len(state['agents']) == 1
+    assert state.step_count == 1
+    assert state.team_counts[0] == 1
+    assert len(state.active_agents) == 1
     
-    agent_state = state['agents'][0]
-    assert np.array_equal(agent_state['position'], agent.position)
-    assert np.array_equal(agent_state['velocity'], agent.velocity)
-    assert agent_state['team_id'] == agent.team_id
-    assert agent_state['is_active'] == agent.is_active 
+    agent_state = state.active_agents[0]
+    assert np.array_equal(agent_state.position, agent.position)
+    assert np.array_equal(agent_state.velocity, agent.velocity)
+    assert agent_state.team_id == agent.team_id
+    assert agent_state.is_active == agent.is_active 

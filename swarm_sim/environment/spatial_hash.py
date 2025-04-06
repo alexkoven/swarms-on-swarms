@@ -25,13 +25,22 @@ class SpatialHash:
     collision detection only needs to check agents in the same or adjacent bins.
     
     Attributes:
-        config: Simulation configuration
-        bin_size: Size of each bin in the grid
+        config: Simulation configuration containing world size and agent radius
+        bin_size: Size of each bin in the grid (based on agent diameter)
         num_bins_x: Number of bins in the x direction
         num_bins_y: Number of bins in the y direction
         bins: Dictionary mapping bin indices to Bin objects
         agent_bins: Dictionary mapping agents to their current bin indices
         collision_checks: Counter for number of collision checks performed
+        
+    Methods:
+        insert(agent): Insert an agent into the appropriate bin
+        remove(agent): Remove an agent from its bin
+        update(agent): Update an agent's position in the spatial hash
+        get_potential_collisions(agent): Get agents that could collide with the given agent
+        check_collision(agent1, agent2): Check if two agents are colliding
+        clear(): Remove all agents from the spatial hash
+        remove_agent(agent): Remove an agent from the spatial hash
     """
     
     def __init__(self, config: SimulationConfig):
@@ -152,4 +161,16 @@ class SpatialHash:
     def clear(self) -> None:
         """Clear all agents from the spatial hash."""
         self.bins.clear()
-        self.agent_bins.clear() 
+        self.agent_bins.clear()
+    
+    def remove_agent(self, agent: Agent) -> None:
+        """Remove an agent from the spatial hash.
+        
+        Args:
+            agent (Agent): Agent to remove
+        """
+        bin_idx = self._get_bin_index(agent.position)
+        if bin_idx in self.bins:
+            bin_obj = self.bins[bin_idx]
+            if agent in bin_obj.agents:
+                bin_obj.agents.remove(agent) 

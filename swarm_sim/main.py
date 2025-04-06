@@ -19,12 +19,23 @@ from .config import config, SimulationConfig
 class SwarmSimulation:
     """Main simulation class handling visualization and control.
     
+    This class manages the simulation environment, controllers, and visualization.
+    It provides methods for running the simulation with or without visualization,
+    and handles the animation of agent positions and status updates.
+    
     Attributes:
         env (SwarmEnv): The swarm environment
         controllers (Dict[int, RandomController]): Controllers for each team
-        fig (plt.Figure): Matplotlib figure for visualization
-        ax (plt.Axes): Matplotlib axes for plotting
-        scatter_plots (Dict[int, plt.scatter]): Scatter plots for each team
+        fig (plt.Figure): Matplotlib figure for visualization (if enabled)
+        ax (plt.Axes): Matplotlib axes for plotting (if enabled)
+        scatter_plots (Dict[int, plt.scatter]): Scatter plots for each team (if enabled)
+        status_text (plt.Text): Text object for displaying simulation status (if enabled)
+    
+    The visualization includes:
+    - Scatter plots for each team's agents
+    - A status panel showing step count, active agents, and performance metrics
+    - Dark theme for better visibility
+    - Real-time updates at the configured frame rate
     """
     
     def __init__(self, env: SwarmEnv):
@@ -36,15 +47,15 @@ class SwarmSimulation:
         self.env = env
         self.controllers = {
             team_id: RandomController() 
-            for team_id in range(config.NUM_TEAMS)
+            for team_id in range(env.config.NUM_TEAMS)
         }
         
         # Setup visualization
-        if config.VISUALIZE:
+        if env.config.VISUALIZE:
             plt.style.use('dark_background')
             self.fig, self.ax = plt.subplots(figsize=(10, 10))
-            self.ax.set_xlim(0, config.WORLD_SIZE)
-            self.ax.set_ylim(0, config.WORLD_SIZE)
+            self.ax.set_xlim(0, env.config.WORLD_SIZE[0])
+            self.ax.set_ylim(0, env.config.WORLD_SIZE[1])
             self.ax.set_aspect('equal')
             self.ax.set_title('Swarm vs Swarm Simulation')
             self.ax.set_xlabel('X Position')
@@ -52,10 +63,10 @@ class SwarmSimulation:
             
             # Create scatter plots for each team
             self.scatter_plots = {}
-            for team_id in range(config.NUM_TEAMS):
+            for team_id in range(env.config.NUM_TEAMS):
                 self.scatter_plots[team_id] = self.ax.scatter(
                     [], [], 
-                    c=config.TEAM_COLORS[team_id % len(config.TEAM_COLORS)],
+                    c=env.config.TEAM_COLORS[team_id % len(env.config.TEAM_COLORS)],
                     label=f'Team {team_id}',
                     alpha=0.8,
                     s=50
@@ -85,16 +96,14 @@ class SwarmSimulation:
             team_agents = self.env.get_team_agents(team_id)
             controller.control_team(team_agents)
         
-        self.env.step()
+        state = self.env.step()
         step_time = time.time() - start_time
         
         # Update visualization
         artists = []
-        active_counts = []
         for team_id, scatter in self.scatter_plots.items():
             team_agents = self.env.get_team_agents(team_id)
             active_agents = [agent for agent in team_agents if agent.is_active]
-            active_counts.append(len(active_agents))
             
             if active_agents:
                 positions = np.array([agent.position for agent in active_agents])
@@ -105,8 +114,8 @@ class SwarmSimulation:
         
         # Update status text
         status = f'Step: {self.env.step_count}\n'
-        for team_id in range(config.NUM_TEAMS):
-            status += f'Team {team_id}: {active_counts[team_id]} active\n'
+        for team_id in range(self.env.config.NUM_TEAMS):
+            status += f'Team {team_id}: {state.team_counts[team_id]} active\n'
         status += f'Step time: {step_time*1000:.1f}ms'
         self.status_text.set_text(status)
         artists.append(self.status_text)
@@ -119,8 +128,8 @@ class SwarmSimulation:
         Args:
             num_steps (Optional[int]): Number of steps to run, or None for infinite
         """
-        if config.VISUALIZE:
-            interval = 1000 / config.FRAME_RATE  # Convert FPS to milliseconds
+        if self.env.config.VISUALIZE:
+            interval = 1000 / self.env.config.FRAME_RATE  # Convert FPS to milliseconds
             anim = FuncAnimation(
                 self.fig, 
                 self.update_visualization,
@@ -130,7 +139,7 @@ class SwarmSimulation:
             )
             plt.show()
         else:
-            steps = num_steps if num_steps is not None else config.MAX_STEPS
+            steps = num_steps if num_steps is not None else self.env.config.MAX_STEPS
             for _ in range(steps):
                 for team_id, controller in self.controllers.items():
                     team_agents = self.env.get_team_agents(team_id)

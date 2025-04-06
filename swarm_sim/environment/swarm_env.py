@@ -110,7 +110,7 @@ class SwarmEnv:
         Returns:
             The created agent
         """
-        agent = Agent(position, velocity, team_id)
+        agent = Agent(position, velocity, team_id, self.config)
         self.agents.append(agent)
         self.spatial_hash.insert(agent)
         self.team_counts[team_id] += 1
@@ -120,12 +120,13 @@ class SwarmEnv:
         """Remove an agent from the simulation.
         
         Args:
-            agent: Agent to remove
+            agent (Agent): Agent to remove
         """
         if agent in self.agents:
             self.agents.remove(agent)
-            self.spatial_hash.remove(agent)
             self.team_counts[agent.team_id] -= 1
+            agent.is_active = False
+            self.spatial_hash.remove_agent(agent)
     
     def get_team_agents(self, team_id: int) -> List[Agent]:
         """Get all active agents for a specific team.
@@ -149,24 +150,37 @@ class SwarmEnv:
         """
         return self.spatial_hash.get_potential_collisions(agent)
     
-    def handle_collisions(self) -> None:
+    def handle_collisions(self) -> List[Tuple[Agent, Agent]]:
         """Handle collisions between agents.
         
-        When agents from different teams collide, they are deactivated.
+        Returns:
+            List of tuples containing pairs of colliding agents
         """
+        collisions = []
         for agent in self.agents:
             if not agent.is_active:
                 continue
                 
-            nearby_agents = self.get_nearby_agents(agent)
-            for other in nearby_agents:
-                if not other.is_active or agent.team_id == other.team_id:
+            nearby = self.spatial_hash.get_potential_collisions(agent)
+            for other in nearby:
+                if not other.is_active or other is agent:
                     continue
                     
-                if agent.check_collision(other):
+                # Only handle collisions between agents of different teams
+                if agent.team_id == other.team_id:
+                    continue
+                    
+                # Check actual collision
+                distance = np.linalg.norm(agent.position - other.position)
+                if distance < 2 * agent.radius:
+                    # Deactivate both agents
                     agent.is_active = False
                     other.is_active = False
-                    break
+                    self.team_counts[agent.team_id] -= 1
+                    self.team_counts[other.team_id] -= 1
+                    collisions.append((agent, other))
+                    
+        return collisions
     
     def step(self) -> SimulationState:
         """Execute one simulation step.
@@ -223,14 +237,14 @@ class SwarmEnv:
         self.initialize_agents()
     
     def get_state(self) -> SimulationState:
-        """Get the current state of the simulation.
+        """Get current simulation state.
         
         Returns:
-            Current simulation state
+            SimulationState object containing current state
         """
         return SimulationState(
             step_count=self.step_count,
-            active_agents=[a for a in self.agents if a.is_active],
             team_counts=self.team_counts.copy(),
-            step_time=0.0  # Not applicable for current state
+            active_agents=[agent for agent in self.agents if agent.is_active],
+            step_time=0.0  # We don't track step time in the environment
         ) 

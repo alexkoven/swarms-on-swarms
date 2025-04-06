@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 from ..controllers.random_controller import RandomController
 from ..environment.agent import Agent
-from ..config import config
+from ..config import config, SimulationConfig
 
 @pytest.fixture
 def controller():
@@ -12,9 +12,14 @@ def controller():
     return RandomController(max_velocity_change=1.0)
 
 @pytest.fixture
-def agent():
+def test_config():
+    """Create a test configuration."""
+    return SimulationConfig()
+
+@pytest.fixture
+def agent(test_config):
     """Create an agent for testing."""
-    return Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0)
+    return Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0, test_config)
 
 def test_initialization(controller):
     """Test controller initialization."""
@@ -41,15 +46,15 @@ def test_apply_action(controller, agent):
     action = np.array([10.0, 10.0])
     controller.apply_action(agent, action)
     velocity_magnitude = np.linalg.norm(agent.velocity)
-    assert velocity_magnitude <= config.MAX_VELOCITY
+    assert velocity_magnitude <= agent.config.MAX_VELOCITY
 
-def test_control_team(controller):
+def test_control_team(controller, test_config):
     """Test team control."""
     # Create a team of agents
     agents = [
-        Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0),
-        Agent(np.array([1.0, 1.0]), np.array([0.0, 0.0]), 0),
-        Agent(np.array([2.0, 2.0]), np.array([0.0, 0.0]), 0)
+        Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0, test_config),
+        Agent(np.array([1.0, 1.0]), np.array([0.0, 0.0]), 0, test_config),
+        Agent(np.array([2.0, 2.0]), np.array([0.0, 0.0]), 0, test_config)
     ]
     
     # Control the team
@@ -59,11 +64,11 @@ def test_control_team(controller):
     for agent in agents:
         if agent.is_active:
             velocity_magnitude = np.linalg.norm(agent.velocity)
-            assert velocity_magnitude <= config.MAX_VELOCITY
+            assert velocity_magnitude <= agent.config.MAX_VELOCITY
 
-def test_inactive_agents(controller):
+def test_inactive_agents(controller, test_config):
     """Test handling of inactive agents."""
-    agent = Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0)
+    agent = Agent(np.array([0.0, 0.0]), np.array([0.0, 0.0]), 0, test_config)
     agent.deactivate()
     
     # Control should not affect inactive agents

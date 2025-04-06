@@ -31,16 +31,19 @@ class SimulationConfig:
         TEAM_COLORS: Colors for each team in the visualization
         FRAME_RATE: Frame rate for visualization
         VISUALIZE: Whether to show visualization
+        BOUNDARY_TYPE: Type of boundary handling ('wrap' or 'bounce')
     """
     
     # World parameters
     WORLD_SIZE: Tuple[float, float] = (1000.0, 1000.0)
     TIME_STEP: float = 0.016  # 60 FPS
+    BOUNDARY_TYPE: str = "wrap"  # 'wrap' or 'bounce'
     
     # Agent parameters
     AGENT_RADIUS: float = 5.0
     MAX_VELOCITY: float = 100.0
     MAX_VELOCITY_CHANGE: float = 10.0
+    MAX_SPEED: float = 100.0  # Alias for MAX_VELOCITY for compatibility
     
     # Team parameters
     NUM_TEAMS: int = 2
@@ -53,6 +56,10 @@ class SimulationConfig:
     
     def __post_init__(self):
         """Validate configuration parameters."""
+        self.validate()
+    
+    def validate(self) -> None:
+        """Validate configuration parameters."""
         assert len(self.WORLD_SIZE) == 2, "WORLD_SIZE must be a tuple of (width, height)"
         assert all(s > 0 for s in self.WORLD_SIZE), "World dimensions must be positive"
         assert self.TIME_STEP > 0, "TIME_STEP must be positive"
@@ -60,9 +67,10 @@ class SimulationConfig:
         assert self.MAX_VELOCITY > 0, "MAX_VELOCITY must be positive"
         assert self.MAX_VELOCITY_CHANGE > 0, "MAX_VELOCITY_CHANGE must be positive"
         assert self.NUM_TEAMS > 0, "NUM_TEAMS must be positive"
-        assert self.AGENTS_PER_TEAM > 0, "AGENTS_PER_TEAM must be positive"
-        assert len(self.TEAM_COLORS) >= self.NUM_TEAMS, "Not enough team colors"
+        assert self.AGENTS_PER_TEAM >= 0, "AGENTS_PER_TEAM must be non-negative"
+        assert len(self.TEAM_COLORS) == self.NUM_TEAMS, "Number of team colors must match number of teams"
         assert self.FRAME_RATE > 0, "FRAME_RATE must be positive"
+        assert self.BOUNDARY_TYPE in ["wrap", "bounce"], "BOUNDARY_TYPE must be 'wrap' or 'bounce'"
 
 # Create global config instance
 config = SimulationConfig() 

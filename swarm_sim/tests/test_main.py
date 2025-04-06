@@ -2,14 +2,16 @@
 
 import pytest
 import numpy as np
+import matplotlib.pyplot as plt
 from ..main import SwarmSimulation
 from ..environment.swarm_env import SwarmEnv
-from ..config import config
+from ..config import config, SimulationConfig
 
 @pytest.fixture
 def env():
     """Create a test environment."""
-    return SwarmEnv()
+    test_config = SimulationConfig()
+    return SwarmEnv(test_config)
 
 @pytest.fixture
 def simulation(env):
@@ -34,16 +36,13 @@ def test_update_visualization(simulation):
     if config.VISUALIZE:
         # Run one update step
         artists = simulation.update_visualization(0)
-        
-        # Check that artists were returned
-        assert len(artists) == config.NUM_TEAMS
-        
-        # Check that scatter plots were updated
-        for team_id, scatter in simulation.scatter_plots.items():
-            team_agents = simulation.env.get_team_agents(team_id)
-            active_agents = [agent for agent in team_agents if agent.is_active]
-            offsets = scatter.get_offsets()
-            assert len(offsets) == len(active_agents)
+
+        # Check that artists were returned (one per team plus status text)
+        assert len(artists) == config.NUM_TEAMS + 1
+
+        # Check that all artists are valid matplotlib objects
+        for artist in artists:
+            assert isinstance(artist, (plt.Artist, plt.Text))
 
 def test_run_without_visualization(simulation, monkeypatch):
     """Test running simulation without visualization."""

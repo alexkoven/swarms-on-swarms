@@ -9,11 +9,24 @@ class RandomController:
     """Controller that generates random actions for agents.
     
     This controller provides basic movement control by generating random
-    velocity changes within specified constraints.
+    velocity changes within specified constraints. It is primarily used for
+    testing and demonstration purposes, as it does not implement any
+    strategic behavior.
+    
+    The controller generates random velocity changes in both x and y
+    directions, which are then applied to the agent's current velocity.
+    The changes are bounded by max_velocity_change to ensure smooth
+    movement and prevent sudden direction changes.
     
     Attributes:
         max_velocity_change (float): Maximum allowed change in velocity per step
-        action_space (Tuple[float, float]): Range for random action values
+        action_space (Tuple[float, float]): Range for random action values,
+            defined as (-max_velocity_change, max_velocity_change)
+    
+    Example:
+        >>> controller = RandomController(max_velocity_change=1.0)
+        >>> action = controller.get_action(agent)
+        >>> agent.set_velocity(agent.velocity + action)
     """
     
     def __init__(self, max_velocity_change: float = config.MAX_VELOCITY_CHANGE):

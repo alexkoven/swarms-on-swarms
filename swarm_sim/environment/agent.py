@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 import numpy as np
-from ..config import config
+from ..config import SimulationConfig
 
 @dataclass
 class Agent:
@@ -13,6 +13,7 @@ class Agent:
         position (np.ndarray): 2D position vector [x, y]
         velocity (np.ndarray): 2D velocity vector [vx, vy]
         team_id (int): Team identifier (0-based)
+        config (SimulationConfig): Configuration for the simulation
         radius (float): Agent's collision radius
         is_active (bool): Whether the agent is currently active in the simulation
     """
@@ -20,7 +21,8 @@ class Agent:
     position: np.ndarray
     velocity: np.ndarray
     team_id: int
-    radius: float = config.AGENT_RADIUS
+    config: SimulationConfig
+    radius: float = None
     is_active: bool = True
     
     def __post_init__(self) -> None:
@@ -29,48 +31,56 @@ class Agent:
         self.position = np.asarray(self.position, dtype=np.float64)
         self.velocity = np.asarray(self.velocity, dtype=np.float64)
         
+        # Set radius from config if not provided
+        if self.radius is None:
+            self.radius = self.config.AGENT_RADIUS
+        
         # Validate dimensions
         assert self.position.shape == (2,), "Position must be a 2D vector"
         assert self.velocity.shape == (2,), "Velocity must be a 2D vector"
         
         # Validate team_id
-        assert 0 <= self.team_id < config.NUM_TEAMS, f"Team ID must be between 0 and {config.NUM_TEAMS - 1}"
+        assert 0 <= self.team_id < self.config.NUM_TEAMS, f"Team ID must be between 0 and {self.config.NUM_TEAMS - 1}"
         
         # Validate radius
         assert self.radius > 0, "Agent radius must be positive"
         
         # Clip velocity to max speed
         speed = np.linalg.norm(self.velocity)
-        if speed > config.MAX_VELOCITY:
-            self.velocity = self.velocity / speed * config.MAX_VELOCITY
+        if speed > self.config.MAX_VELOCITY:
+            self.velocity = self.velocity / speed * self.config.MAX_VELOCITY
     
     def update_position(self, dt: float) -> None:
-        """Update agent's position based on current velocity and time step.
-        
-        Args:
-            dt (float): Time step for position update
-        """
-        assert dt > 0, "Time step must be positive"
-        self.position += self.velocity * dt
-        
-        # Handle world boundaries (wrap around)
-        self.position = self.position % config.WORLD_SIZE
+        """Update agent position based on velocity and boundary conditions."""
+        new_position = self.position + self.velocity * dt
+
+        if self.config.BOUNDARY_TYPE == "wrap":
+            # Wrap around world boundaries
+            new_position = np.mod(new_position, self.config.WORLD_SIZE)
+        elif self.config.BOUNDARY_TYPE == "bounce":
+            # Bounce off world boundaries
+            for i in range(2):
+                if new_position[i] < 0:
+                    new_position[i] = 0
+                    self.velocity[i] *= -1
+                elif new_position[i] > self.config.WORLD_SIZE[i]:
+                    new_position[i] = self.config.WORLD_SIZE[i]
+                    self.velocity[i] *= -1
+
+        self.position = new_position
     
-    def set_velocity(self, new_velocity: np.ndarray) -> None:
-        """Set agent's velocity with speed limit enforcement.
+    def set_velocity(self, velocity: np.ndarray) -> None:
+        """Set the agent's velocity, enforcing speed limit."""
+        velocity = np.asarray(velocity, dtype=np.float64)
+        speed = np.linalg.norm(velocity)
         
-        Args:
-            new_velocity (np.ndarray): New velocity vector [vx, vy]
-        """
-        new_velocity = np.asarray(new_velocity, dtype=np.float64)
-        assert new_velocity.shape == (2,), "Velocity must be a 2D vector"
-        
-        # Clip velocity to max speed
-        speed = np.linalg.norm(new_velocity)
-        if speed > config.MAX_VELOCITY:
-            self.velocity = new_velocity / speed * config.MAX_VELOCITY
+        if speed < 1e-10:  # Handle zero or near-zero velocity
+            self.velocity = np.zeros(2, dtype=np.float64)
+        elif speed > self.config.MAX_VELOCITY:
+            # Scale velocity to maximum speed while preserving direction
+            self.velocity = (velocity / speed) * self.config.MAX_VELOCITY
         else:
-            self.velocity = new_velocity
+            self.velocity = velocity.copy()
     
     def get_state(self) -> Tuple[np.ndarray, np.ndarray, int]:
         """Get the current state of the agent.
