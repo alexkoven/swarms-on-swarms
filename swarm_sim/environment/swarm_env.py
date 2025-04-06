@@ -202,11 +202,24 @@ class SwarmEnv:
                 continue
                 
             # Update position
-            agent.position += agent.velocity * self.time_step
+            new_position = agent.position + agent.velocity * self.time_step
             
-            # Handle world boundaries
-            agent.position[0] %= self.config.WORLD_SIZE[0]
-            agent.position[1] %= self.config.WORLD_SIZE[1]
+            # Handle world boundaries with hard boundaries
+            if new_position[0] - agent.radius < 0:
+                new_position[0] = agent.radius
+                agent.velocity[0] = -agent.velocity[0]
+            elif new_position[0] + agent.radius > self.config.WORLD_SIZE[0]:
+                new_position[0] = self.config.WORLD_SIZE[0] - agent.radius
+                agent.velocity[0] = -agent.velocity[0]
+                
+            if new_position[1] - agent.radius < 0:
+                new_position[1] = agent.radius
+                agent.velocity[1] = -agent.velocity[1]
+            elif new_position[1] + agent.radius > self.config.WORLD_SIZE[1]:
+                new_position[1] = self.config.WORLD_SIZE[1] - agent.radius
+                agent.velocity[1] = -agent.velocity[1]
+            
+            agent.position = new_position
             
             # Update spatial hash
             self.spatial_hash.update(agent)
