@@ -157,7 +157,13 @@ class SwarmEnv:
             List of tuples containing pairs of colliding agents
         """
         collisions = []
-        for agent in self.agents:
+        processed_pairs = set()  # Track processed agent pairs to avoid double-counting
+        
+        # Create a randomized copy of the agents list to avoid processing bias
+        agents_randomized = self.agents.copy()
+        np.random.shuffle(agents_randomized)
+        
+        for agent in agents_randomized:
             if not agent.is_active:
                 continue
                 
@@ -170,6 +176,11 @@ class SwarmEnv:
                 if agent.team_id == other.team_id:
                     continue
                     
+                # Avoid processing the same pair twice
+                pair = tuple(sorted([agent, other], key=lambda x: x.team_id))
+                if pair in processed_pairs:
+                    continue
+                    
                 # Check actual collision
                 distance = np.linalg.norm(agent.position - other.position)
                 if distance < 2 * agent.radius:
@@ -179,6 +190,7 @@ class SwarmEnv:
                     self.team_counts[agent.team_id] -= 1
                     self.team_counts[other.team_id] -= 1
                     collisions.append((agent, other))
+                    processed_pairs.add(pair)
                     
         return collisions
     
