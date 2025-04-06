@@ -220,7 +220,12 @@ class SwarmEnv:
         # Calculate step time
         step_time = time.time() - start_time
         
-        # Return current state
+        # Verify team counts are accurate
+        for team_id in range(self.config.NUM_TEAMS):
+            active_count = len([a for a in self.agents if a.team_id == team_id and a.is_active])
+            self.team_counts[team_id] = active_count
+        
+        # Return current state with updated team counts
         return SimulationState(
             step_count=self.step_count,
             active_agents=[a for a in self.agents if a.is_active],

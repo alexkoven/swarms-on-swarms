@@ -131,7 +131,8 @@ class SpatialHash:
                 if (0 <= check_x < self.num_bins_x and 
                     0 <= check_y < self.num_bins_y):
                     check_bin = self.bins[(check_x, check_y)]
-                    potential_collisions.update(check_bin.agents)
+                    # Only include active agents
+                    potential_collisions.update(a for a in check_bin.agents if a.is_active)
         
         # Remove the agent itself from potential collisions
         potential_collisions.discard(agent)

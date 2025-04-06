@@ -55,7 +55,7 @@ def update_visualization(frame: int, env: SwarmEnv, ax: plt.Axes, title: plt.Tex
     # Update agent positions
     artists = []
     for team_id, scatter in enumerate(scatter_plots):
-        team_agents = [a for a in env.agents if a.team_id == team_id and a.is_active]
+        team_agents = env.get_team_agents(team_id)
         if team_agents:
             positions = np.array([a.position for a in team_agents])
             scatter.set_offsets(positions)
@@ -219,6 +219,8 @@ def main():
     parser.add_argument('--steps', type=int, help='Number of steps to run')
     parser.add_argument('--no-vis', action='store_true', help='Disable visualization')
     parser.add_argument('--config', type=str, help='Path to config file')
+    parser.add_argument('--max-velocity', type=float, help='Maximum velocity for agents')
+    parser.add_argument('--time-step', type=float, help='Simulation time step in seconds')
     args = parser.parse_args()
     
     # Create configuration
@@ -230,6 +232,11 @@ def main():
     # Override config with command line arguments
     if args.no_vis:
         config.VISUALIZE = False
+    if args.max_velocity is not None:
+        config.MAX_VELOCITY = args.max_velocity
+        config.MAX_SPEED = args.max_velocity  # Update alias for compatibility
+    if args.time_step is not None:
+        config.TIME_STEP = args.time_step
     
     # Create and run simulation
     env = SwarmEnv(config)
