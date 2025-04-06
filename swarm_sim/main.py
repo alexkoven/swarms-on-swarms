@@ -48,7 +48,8 @@ def update_visualization(frame: int, env: SwarmEnv, ax: plt.Axes, title: plt.Tex
     # Update status panel
     status_text = f'Step: {frame}\n'
     for team_id in range(env.config.NUM_TEAMS):
-        status_text += f'Team {team_id}: {state.team_counts[team_id]} active\n'
+        color = env.config.TEAM_COLORS[team_id % len(env.config.TEAM_COLORS)]
+        status_text += f'Team {team_id} ({color}): {state.team_counts[team_id]} active\n'
     status_text += f'Step time: {step_time*1000:.1f}ms'
     status.set_text(status_text)
     
