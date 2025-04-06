@@ -182,12 +182,13 @@ def create_visualization(env: SwarmEnv) -> Tuple[plt.Figure, plt.Axes]:
     
     return fig, ax, title, status
 
-def run_simulation(env: SwarmEnv, num_steps: int = None) -> None:
+def run_simulation(env: SwarmEnv, num_steps: int = None, save_gif_path: str = None) -> None:
     """Run the simulation with visualization.
     
     Args:
         env: Simulation environment
         num_steps: Number of steps to run (None for infinite)
+        save_gif_path: Path to save the animation as a GIF file
     """
     # Create visualization
     fig, ax, title, status = create_visualization(env)
@@ -211,7 +212,21 @@ def run_simulation(env: SwarmEnv, num_steps: int = None) -> None:
         blit=True
     )
     
-    plt.show()
+    # Save as GIF if requested
+    if save_gif_path:
+        print(f"Saving animation to {save_gif_path}...")
+        # Use lower framerate for GIF to keep file size reasonable
+        save_fps = min(30, env.config.FRAME_RATE)
+        writer = 'pillow'
+        anim.save(
+            save_gif_path, 
+            writer=writer, 
+            fps=save_fps,
+            progress_callback=lambda i, n: print(f"Saving frame {i}/{n}", end="\r")
+        )
+        print(f"\nAnimation saved to {save_gif_path}")
+    else:
+        plt.show()
 
 def main():
     """Main entry point for the simulation."""
@@ -222,6 +237,7 @@ def main():
     parser.add_argument('--config', type=str, help='Path to config file')
     parser.add_argument('--max-velocity', type=float, help='Maximum velocity for agents')
     parser.add_argument('--time-step', type=float, help='Simulation time step in seconds')
+    parser.add_argument('--save-gif', type=str, help='Save animation as GIF to specified path')
     args = parser.parse_args()
     
     # Create configuration
@@ -242,7 +258,7 @@ def main():
     # Create and run simulation
     env = SwarmEnv(config)
     if config.VISUALIZE:
-        run_simulation(env, args.steps)
+        run_simulation(env, args.steps, save_gif_path=args.save_gif)
     else:
         # Run without visualization
         for _ in range(args.steps or 1000):
