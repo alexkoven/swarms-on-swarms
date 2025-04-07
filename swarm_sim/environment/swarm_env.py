@@ -208,6 +208,9 @@ class SwarmEnv:
         """
         start_time = time.time()
         
+        # Clean up inactive agents from spatial hash first
+        self.spatial_hash.cleanup_inactive_agents()
+        
         # Update agent states
         for agent in self.agents:
             if not agent.is_active:
@@ -244,11 +247,6 @@ class SwarmEnv:
         
         # Calculate step time
         step_time = time.time() - start_time
-        
-        # Verify team counts are accurate
-        for team_id in range(self.config.NUM_TEAMS):
-            active_count = len([a for a in self.agents if a.team_id == team_id and a.is_active])
-            self.team_counts[team_id] = active_count
         
         # Return current state with updated team counts
         return SimulationState(

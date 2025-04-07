@@ -117,10 +117,10 @@ class Agent:
         Returns:
             int: Hash value
         """
-        # Convert position and velocity to tuples for hashing
-        pos_tuple = tuple(self.position)
-        vel_tuple = tuple(self.velocity)
-        return hash((pos_tuple, vel_tuple, self.team_id, self.radius, self.is_active))
+        # Only use immutable properties for hashing
+        # We use id() to get a unique identifier for this agent instance
+        # This ensures the hash doesn't change when position/velocity change
+        return hash((id(self), self.team_id))
     
     def check_collision(self, other: 'Agent') -> bool:
         """Check if this agent collides with another agent.

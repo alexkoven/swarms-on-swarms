@@ -118,21 +118,65 @@ class SwarmSimulation:
                 team_agents = [a for a in env.agents if a.team_id == team_id and a.is_active]
                 if team_agents:
                     positions = np.array([a.position for a in team_agents])
-                    scatter = self.ax.scatter(positions[:, 0], positions[:, 1],
-                                           c=env.config.TEAM_COLORS[team_id % len(env.config.TEAM_COLORS)],
-                                           label=f'Team {team_id}',
-                                           alpha=0.8,
-                                           s=50)
+                    scatter = self.ax.scatter(
+                        positions[:, 0], positions[:, 1],
+                        c=env.config.TEAM_COLORS[team_id],
+                        alpha=0.6,
+                        s=100
+                    )
                     self.scatter_plots.append(scatter)
-            self.ax.legend(loc='upper right')
             
             # Add status text
             self.status_text = self.ax.text(
-                0.02, 0.98, '', 
+                0.02, 0.98,
+                '',
                 transform=self.ax.transAxes,
                 verticalalignment='top',
-                color='white'
+                bbox=dict(boxstyle='round', facecolor='black', alpha=0.7)
             )
+    
+    def update_visualization(self, frame: int) -> List[plt.Artist]:
+        """Update the visualization for the current frame.
+        
+        Args:
+            frame: Current frame number
+            
+        Returns:
+            List of updated artists (one per team plus status text)
+        """
+        if not self.env.config.VISUALIZE:
+            return []
+            
+        # Run simulation step
+        start_time = time.time()
+        for team_id, controller in self.controllers.items():
+            team_agents = self.env.get_team_agents(team_id)
+            controller.control_team(team_agents)
+        
+        state = self.env.step()
+        step_time = time.time() - start_time
+        
+        # Update title with frame count
+        self.title.set_text(f'Swarm Simulation - Step {frame}')
+        
+        # Update status panel
+        status_text = f'Step: {frame}\n'
+        for team_id in range(self.env.config.NUM_TEAMS):
+            active_agents = sum(1 for a in self.env.agents if a.team_id == team_id and a.is_active)
+            status_text += f'Team {team_id}: {active_agents} active\n'
+        status_text += f'Step time: {step_time:.3f}s'
+        self.status_text.set_text(status_text)
+        
+        # Update scatter plots
+        artists = [self.status_text]  # Only include status text, not title
+        for team_id, scatter in enumerate(self.scatter_plots):
+            team_agents = [a for a in self.env.agents if a.team_id == team_id and a.is_active]
+            if team_agents:
+                positions = np.array([a.position for a in team_agents])
+                scatter.set_offsets(positions)
+                artists.append(scatter)
+        
+        return artists
     
     def run(self, num_steps: Optional[int] = None) -> None:
         """Run the simulation.
@@ -144,9 +188,7 @@ class SwarmSimulation:
             interval = 1000 / self.env.config.FRAME_RATE  # Convert FPS to milliseconds
             anim = FuncAnimation(
                 self.fig, 
-                update_visualization,
-                fargs=(self.env, self.ax, self.title, self.status_text, 
-                       self.scatter_plots, self.controllers),
+                self.update_visualization,
                 frames=num_steps,
                 interval=interval,
                 blit=True

@@ -41,6 +41,7 @@ class SpatialHash:
         check_collision(agent1, agent2): Check if two agents are colliding
         clear(): Remove all agents from the spatial hash
         remove_agent(agent): Remove an agent from the spatial hash
+        cleanup_inactive_agents(): Remove all inactive agents from the spatial hash
     """
     
     def __init__(self, config: SimulationConfig):
@@ -174,8 +175,14 @@ class SpatialHash:
         Args:
             agent (Agent): Agent to remove
         """
-        bin_idx = self._get_bin_index(agent.position)
-        if bin_idx in self.bins:
-            bin_obj = self.bins[bin_idx]
-            if agent in bin_obj.agents:
-                bin_obj.agents.remove(agent) 
+        if agent in self.agent_bins:
+            bin_idx = self.agent_bins[agent]
+            if bin_idx in self.bins:
+                self.bins[bin_idx].agents.discard(agent)
+            del self.agent_bins[agent]
+    
+    def cleanup_inactive_agents(self) -> None:
+        """Remove all inactive agents from the spatial hash."""
+        inactive_agents = [agent for agent in self.agent_bins.keys() if not agent.is_active]
+        for agent in inactive_agents:
+            self.remove(agent) 
